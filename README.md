@@ -351,5 +351,4 @@
 			 jiangxs
     </p>
 </div>
-<div align="center"><img src="assets/wechat-fullstack.png" width="620"/></div><br/>
 
