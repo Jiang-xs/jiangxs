@@ -2,7 +2,7 @@
 
 	本文主要包含 Java 核心基础知识
 
- 	主要内容：数据类型、String、运算
+ 	主要内容：数据类型、String、运算、继承、Object通用方法、关键字、反射、异常、泛型、注解、Lambda 表达式以及相关资料
 
 
 # 一、数据类型
@@ -22,8 +22,7 @@
 
 基本类型都有对应的包装类型，基本类型与其对应的包装类型之间的赋值使用自动装箱与拆箱完成。
 
-```
-java
+```java
 Integer x = 2;     // 装箱
 int y = x;         // 拆箱
 ```
@@ -35,12 +34,66 @@ new Integer(123) 与 Integer.valueOf(123) 的区别在于：
 - new Integer(123) 每次都会新建一个对象；
 - Integer.valueOf(123) 会使用缓存池中的对象，多次调用会取得同一个对象的引用。
 
+```java
+Integer x = new Integer(123);
+Integer y = new Integer(123);
+System.out.println(x == y);    // false
+Integer z = Integer.valueOf(123);
+Integer k = Integer.valueOf(123);
+System.out.println(z == k);   // true
+```
 
 valueOf() 方法的实现比较简单，就是先判断值是否在缓存池中，如果在的话就直接返回缓存池的内容。
 
+```java
+public static Integer valueOf(int i) {
+    if (i >= IntegerCache.low && i <= IntegerCache.high)
+        return IntegerCache.cache[i + (-IntegerCache.low)];
+    return new Integer(i);
+}
+```
+
 在 Java 8 中，Integer 缓存池的大小默认为 -128\~127。
 
+```java
+static final int low = -128;
+static final int high;
+static final Integer cache[];
+
+static {
+    // high value may be configured by property
+    int h = 127;
+    String integerCacheHighPropValue =
+        sun.misc.VM.getSavedProperty("java.lang.Integer.IntegerCache.high");
+    if (integerCacheHighPropValue != null) {
+        try {
+            int i = parseInt(integerCacheHighPropValue);
+            i = Math.max(i, 127);
+            // Maximum array size is Integer.MAX_VALUE
+            h = Math.min(i, Integer.MAX_VALUE - (-low) -1);
+        } catch( NumberFormatException nfe) {
+            // If the property cannot be parsed into an int, ignore it.
+        }
+    }
+    high = h;
+
+    cache = new Integer[(high - low) + 1];
+    int j = low;
+    for(int k = 0; k < cache.length; k++)
+        cache[k] = new Integer(j++);
+
+    // range [-128, 127] must be interned (JLS7 5.1.7)
+    assert IntegerCache.high >= 127;
+}
+```
+
 编译器会在自动装箱过程调用 valueOf() 方法，因此多个 Integer 实例使用自动装箱来创建并且值相同，那么就会引用相同的对象。
+
+```java
+Integer m = 123;
+Integer n = 123;
+System.out.println(m == n); // true
+```
 
 基本类型对应的缓冲池如下：
 
@@ -52,6 +105,9 @@ valueOf() 方法的实现比较简单，就是先判断值是否在缓存池中�
 
 在使用这些基本类型对应的包装类型时，就可以直接使用缓冲池中的对象。
 
+[StackOverflow : Differences between new Integer(123), Integer.valueOf(123) and just 123
+](https://stackoverflow.com/questions/9030817/differences-between-new-integer123-integer-valueof123-and-just-123)
+
 # 二、String
 
 ## 概览
@@ -60,7 +116,26 @@ String 被声明为 final，因此它不可被继承。
 
 在 Java 8 中，String 内部使用 char 数组存储数据。
 
+```java
+public final class String
+    implements java.io.Serializable, Comparable<String>, CharSequence {
+    /** The value is used for character storage. */
+    private final char value[];
+}
+```
+
 在 Java 9 之后，String 类的实现改用 byte 数组存储字符串，同时使用 `coder` 来标识使用了哪种编码。
+
+```java
+public final class String
+    implements java.io.Serializable, Comparable<String>, CharSequence {
+    /** The value is used for character storage. */
+    private final byte[] value;
+
+    /** The identifier of the encoding used to encode the bytes in {@code value}. */
+    private final byte coder;
+}
+```
 
 value 数组被声明为 final，这意味着 value 数组初始化之后就不能再引用其它数组。并且 String 内部没有改变 value 数组的方法，因此可以保证 String 不可变。
 
@@ -84,6 +159,8 @@ String 经常作为参数，String 不可变性可以保证参数不可变。例
 
 String 不可变性天生具备线程安全，可以在多个线程中安全地使用。
 
+[扩展 : String详解 ](www.baidu.com)
+
 ## String, StringBuffer and StringBuilder
 
 **1. 可变性** 
@@ -97,6 +174,8 @@ String 不可变性天生具备线程安全，可以在多个线程中安全地�
 - StringBuilder 不是线程安全的
 - StringBuffer 是线程安全的，内部使用 synchronized 进行同步
 
+[StackOverflow : String, StringBuffer, and StringBuilder](https://stackoverflow.com/questions/2971315/string-stringbuffer-and-stringbuilder)
+
 ## String Pool
 
 字符串常量池（String Pool）保存着所有字符串字面量（literal strings），这些字面量在编译时期就确定。不仅如此，还可以使用 String 的 intern() 方法在运行过程中将字符串添加到 String Pool 中。
@@ -105,9 +184,27 @@ String 不可变性天生具备线程安全，可以在多个线程中安全地�
 
 下面示例中，s1 和 s2 采用 new String() 的方式新建了两个不同字符串，而 s3 和 s4 是通过 s1.intern() 方法取得一个字符串引用。intern() 首先把 s1 引用的字符串放到 String Pool 中，然后返回这个字符串引用。因此 s3 和 s4 引用的是同一个字符串。
 
+```java
+String s1 = new String("aaa");
+String s2 = new String("aaa");
+System.out.println(s1 == s2);           // false
+String s3 = s1.intern();
+String s4 = s1.intern();
+System.out.println(s3 == s4);           // true
+```
+
 如果是采用 "bbb" 这种字面量的形式创建字符串，会自动地将字符串放入 String Pool 中。
 
+```java
+String s5 = "bbb";
+String s6 = "bbb";
+System.out.println(s5 == s6);  // true
+```
+
 在 Java 7 之前，String Pool 被放在运行时常量池中，它属于永久代。而在 Java 7，String Pool 被移到堆中。这是因为永久代的空间有限，在大量使用字符串的场景下会导致 OutOfMemoryError 错误。
+
+- [StackOverflow : What is String interning?](https://stackoverflow.com/questions/10578984/what-is-string-interning)
+- [深入解析 String#intern](https://tech.meituan.com/in_depth_understanding_string_intern.html)
 
 ## new String("abc")
 
@@ -118,11 +215,50 @@ String 不可变性天生具备线程安全，可以在多个线程中安全地�
 
 创建一个测试类，其 main 方法中使用这种方式来创建字符串对象。
 
+```java
+public class NewStringTest {
+    public static void main(String[] args) {
+        String s = new String("abc");
+    }
+}
+```
+
 使用 javap -verbose 进行反编译，得到以下内容：
+
+```java
+// ...
+Constant pool:
+// ...
+   #2 = Class              #18            // java/lang/String
+   #3 = String             #19            // abc
+// ...
+  #18 = Utf8               java/lang/String
+  #19 = Utf8               abc
+// ...
+
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=3, locals=2, args_size=1
+         0: new           #2                  // class java/lang/String
+         3: dup
+         4: ldc           #3                  // String abc
+         6: invokespecial #4                  // Method java/lang/String."<init>":(Ljava/lang/String;)V
+         9: astore_1
+// ...
+```
 
 在 Constant Pool 中，#19 存储这字符串字面量 "abc"，#3 是 String Pool 的字符串对象，它指向 #19 这个字符串字面量。在 main 方法中，0: 行使用 new #2 在堆中创建一个字符串对象，并且使用 ldc #3 将 String Pool 中的字符串对象作为 String 构造函数的参数。
 
 以下是 String 构造函数的源码，可以看到，在将一个字符串对象作为另一个字符串对象的构造函数参数时，并不会完全复制 value 数组内容，而是都会指向同一个 value 数组。
+
+```java
+public String(String original) {
+    this.value = original.value;
+    this.hash = original.hash;
+}
+```
 
 # 三、运算
 
@@ -132,7 +268,65 @@ Java 的参数是以值传递的形式传入方法中，而不是引用传递。
 
 以下代码中 Dog dog 的 dog 是一个指针，存储的是对象的地址。在将一个参数传入一个方法时，本质上是将对象的地址以值的方式传递到形参中。因此在方法中使指针引用其它对象，那么这两个指针此时指向的是完全不同的对象，在一方改变其所指向对象的内容时对另一方没有影响。
 
+```java
+public class Dog {
+
+    String name;
+
+    Dog(String name) {
+        this.name = name;
+    }
+
+    String getName() {
+        return this.name;
+    }
+
+    void setName(String name) {
+        this.name = name;
+    }
+
+    String getObjectAddress() {
+        return super.toString();
+    }
+}
+```
+
+```java
+public class PassByValueExample {
+    public static void main(String[] args) {
+        Dog dog = new Dog("A");
+        System.out.println(dog.getObjectAddress()); // Dog@4554617c
+        func(dog);
+        System.out.println(dog.getObjectAddress()); // Dog@4554617c
+        System.out.println(dog.getName());          // A
+    }
+
+    private static void func(Dog dog) {
+        System.out.println(dog.getObjectAddress()); // Dog@4554617c
+        dog = new Dog("B");
+        System.out.println(dog.getObjectAddress()); // Dog@74a14482
+        System.out.println(dog.getName());          // B
+    }
+}
+```
+
 如果在方法中改变对象的字段值会改变原对象该字段值，因为改变的是同一个地址指向的内容。
+
+```java
+class PassByValueExample {
+    public static void main(String[] args) {
+        Dog dog = new Dog("A");
+        func(dog);
+        System.out.println(dog.getName());          // B
+    }
+
+    private static void func(Dog dog) {
+        dog.setName("B");
+    }
+}
+```
+
+[StackOverflow: Is Java “pass-by-reference” or “pass-by-value”?](https://stackoverflow.com/questions/40480/is-java-pass-by-reference-or-pass-by-value)
 
 ## float 与 double
 
@@ -171,6 +365,8 @@ s1 += 1;
 ```java
 s1 = (short) (s1 + 1);
 ```
+
+[StackOverflow : Why don't Java's +=, -=, *=, /= compound assignment operators require casting?](https://stackoverflow.com/questions/8710619/why-dont-javas-compound-assignment-operators-require-casting)
 
 ## switch
 
@@ -1029,73 +1225,501 @@ Throwable 可以用来表示任何可以作为异常抛出的类，分为两种�
 
 # 九、泛型
 
+### 通俗解释
+
+　　通俗的讲，泛型就是操作类型的 占位符，即：假设占位符为 T，那么此次声明的数据结构操作的数据类型为T类型。
+
+　　假定我们有这样一个需求：写一个排序方法，能够对整型数组、字符串数组甚至其他任何类型的数组进行排序，该如何实现？答案是可以使用 **Java 泛型**。
+
+　　使用 Java 泛型的概念，我们可以写一个泛型方法来对一个对象数组排序。然后，调用该泛型方法来对整型数组、浮点数数组、字符串数组等进行排序。
+
+### 泛型方法
+
+　　你可以写一个泛型方法，该方法在调用时可以接收不同类型的参数。根据传递给泛型方法的参数类型，编译器适当地处理每一个方法调用。
+
+下面是定义泛型方法的规则：
+
+- 所有泛型方法声明都有一个类型参数声明部分（由尖括号分隔），该类型参数声明部分在方法返回类型之前（在下面例子中的 \<E>）。
+- 每一个类型参数声明部分包含一个或多个类型参数，参数间用逗号隔开。一个泛型参数，也被称为一个类型变量，是用于指定一个泛型类型名称的标识符。
+- 类型参数能被用来声明返回值类型，并且能作为泛型方法得到的实际参数类型的占位符。
+- 泛型方法体的声明和其他方法一样。注意类型参数 **只能代表引用型类型，不能是原始类型** （像 int,double,char 的等）。
+
 ```java
-public class Box<T> {
-    // T stands for "Type"
-    private T t;
-    public void set(T t) { this.t = t; }
-    public T get() { return t; }
+public class GenericMethodTest
+{
+   // 泛型方法 printArray                         
+   public static < E > void printArray( E[] inputArray )
+   {
+      // 输出数组元素            
+         for ( E element : inputArray ){        
+            System.out.printf( "%s ", element );
+         }
+         System.out.println();
+    }
+ 
+    public static void main( String args[] )
+    {
+        // 创建不同类型数组： Integer, Double 和 Character
+        Integer[] intArray = { 1, 2, 3, 4, 5 };
+        Double[] doubleArray = { 1.1, 2.2, 3.3, 4.4 };
+        Character[] charArray = { 'H', 'E', 'L', 'L', 'O' };
+ 
+        System.out.println( "整型数组元素为:" );
+        printArray( intArray  ); // 传递一个整型数组
+ 
+        System.out.println( "\n双精度型数组元素为:" );
+        printArray( doubleArray ); // 传递一个双精度型数组
+ 
+        System.out.println( "\n字符型数组元素为:" );
+        printArray( charArray ); // 传递一个字符型数组
+    } 
 }
 ```
 
-- [Java 泛型详解](http://www.importnew.com/24029.html)
-- [10 道 Java 泛型面试题](https://cloud.tencent.com/developer/article/1033693)
+
+
+### 泛型类
+
+　　泛型类的声明和非泛型类的声明类似，除了在类名后面添加了类型参数声明部分。
+
+　　和泛型方法一样，泛型类的类型参数声明部分也包含一个或多个类型参数，参数间用逗号隔开。一个泛型参数，也被称为一个类型变量，是用于指定一个泛型类型名称的标识符。因为他们接受一个或多个参数，这些类被称为参数化的类或参数化的类型。
+
+```java
+public class Box<T> {
+	private T t;
+	public void add(T t) {
+	    this.t = t;
+	}
+
+	public T get() {
+	    return t;
+	}
+
+	public static void main(String[] args) {
+	    Box<Integer> integerBox = new Box<Integer>();
+	    Box<String> stringBox = new Box<String>();
+
+	    integerBox.add(new Integer(10));
+	    stringBox.add(new String("菜鸟教程"));
+
+	    System.out.printf("整型值为 :%d\n\n", integerBox.get());
+	    System.out.printf("字符串为 :%s\n", stringBox.get());
+	}
+}
+```
+
+### 类型通配符
+
+1. 类型通配符一般是使用 `?` 代替具体的类型参数。例如  `List<?>` 在逻辑上是 `List<String>`，`List<Integer>` 等所有 **List<具体类型实参>** 的父类。  
+
+2. 类型通配符上限通过形如 List 来定义，如此定义就是通配符泛型值接受 Number 及其下层子类类型。  
+
+3. 类型通配符下限通过形如 List<? super Number> 来定义，表示类型只能接受 Number 及其三层父类类型，如 Objec 类型的实例。  
+
 
 # 十、注解
 
-Java 注解是附加在代码中的一些元信息，用于一些工具在编译、运行时进行解析和使用，起到说明、配置的功能。注解不会也不能影响代码的实际逻辑，仅仅起到辅助性的作用。
+### 什么是注解
 
-[注解 Annotation 实现原理与自定义注解例子](https://www.cnblogs.com/acm-bingzi/p/javaAnnotation.html)
+　　Annontation 是 Java5 开始引入的新特征，中文名称叫注解。它提供了一种安全的类似注释的机制，用来**将任何的信息或元数据（metadata）与程序元素（类、方法、成员变量等）进行关联**。为程序的元素（类、方法、成员变量）加上更直观更明了的说明，这些说明信息是与程序的业务逻辑无关，并且供指定的工具或框架使用。Annontation 像一种修饰符一样，应用于包、类型、构造方法、方法、成员变量、参数及本地变量的声明语句中。
 
-# 十一、特性
+　　Java 注解是附加在代码中的一些元信息，用于一些工具在编译、运行时进行解析和使用，起到说明、配置的功能。注解不会也不能影响代码的实际逻辑，仅仅起到辅助性的作用。包含在 ` java.lang.annotation` 包中。
 
-## Java 各版本的新特性
+　　简单来说：注解其实就是**代码中的特殊标记**，这些标记可以**在编译、类加载、运行时被读取，并执行相对应的处理**。 
 
-**New highlights in Java SE 8** 
 
-1. Lambda Expressions
-2. Pipelines and Streams
-3. Date and Time API
-4. Default Methods
-5. Type Annotations
-6. Nashhorn JavaScript Engine
-7. Concurrent Accumulators
-8. Parallel operations
-9. PermGen Error Removed
 
-**New highlights in Java SE 7** 
+### 为什么要用注解
 
-1. Strings in Switch Statement
-2. Type Inference for Generic Instance Creation
-3. Multiple Exception Handling
-4. Support for Dynamic Languages
-5. Try with Resources
-6. Java nio Package
-7. Binary Literals, Underscore in literals
-8. Diamond Syntax
+传统的方式，我们是通过配置文件 `.xml` 来告诉类是如何运行的。
 
-- [Difference between Java 1.8 and Java 1.7?](http://www.selfgrowth.com/articles/difference-between-java-18-and-java-17)
-- [Java 8 特性](http://www.importnew.com/19345.html)
+有了注解技术以后，我们就可以通过注解告诉类如何运行
 
-## Java 与 C++ 的区别
+例如：我们以前编写 Servlet 的时候，需要在 web.xml 文件配置具体的信息。我们使用了注解以后，可以直接在 Servlet 源代码上，增加注解...Servlet 就被配置到 Tomcat 上了。也就是说，注解可以给类、方法上注入信息。
 
-- Java 是纯粹的面向对象语言，所有的对象都继承自 java.lang.Object，C++ 为了兼容 C 即支持面向对象也支持面向过程。
-- Java 通过虚拟机从而实现跨平台特性，但是 C++ 依赖于特定的平台。
-- Java 没有指针，它的引用可以理解为安全指针，而 C++ 具有和 C 一样的指针。
-- Java 支持自动垃圾回收，而 C++ 需要手动回收。
-- Java 不支持多重继承，只能通过实现多个接口来达到相同目的，而 C++ 支持多重继承。
-- Java 不支持操作符重载，虽然可以对两个 String 对象执行加法运算，但是这是语言内置支持的操作，不属于操作符重载，而 C++ 可以。
-- Java 的 goto 是保留字，但是不可用，C++ 可以使用 goto。
-- Java 不支持条件编译，C++ 通过 #ifdef #ifndef 等预处理命令从而实现条件编译。
+明显地可以看出，这样是非常直观的，并且 Servlet 规范是推崇这种配置方式的。 
 
-[What are the main differences between Java and C++?](http://cs-fundamentals.com/tech-interview/java/differences-between-java-and-cpp.php)
 
-## JRE or JDK
 
-- JRE is the JVM program, Java application need to run on JRE.
-- JDK is a superset of JRE, JRE + tools for developing java programs. e.g, it provides the compiler "javac"
+### 基本Annotation
 
-# 参考资料
+在 java.lang 包下存在着5个基本的 Annotation，重点掌握前三个。
 
-- Eckel B. Java 编程思想[M]. 机械工业出版社, 2002.
-- Bloch J. Effective java[M]. Addison-Wesley Professional, 2017.
+1. @Override 重写注解
+   - 如果我们使用IDE重写父类的方法，我们就可以看见它了。
+   - @Override是告诉编译器要检查该方法是实现父类的，可以帮我们避免一些低级的错误。
+   - 比如，我们在实现 equals() 方法的时候，把 euqals() 打错了，那么编译器就会发现该方法并不是实现父类的，与注解 @Override 冲突，于是就会给予错误。
+
+2. @Deprecated 过时注解
+   - 该注解也非常常见，Java 在设计的时候，可能觉得某些方法设计得不好，为了兼容以前的程序，是不能直接把它抛弃的，于是就设置它为过时。
+   - Date对象中的 toLocalString() 就被设置成过时了
+   - 当我们在程序中调用它的时候，在 IDE 上会出现一条横杠，说明该方法是过时的。
+
+```java
+@Deprecated
+public String toLocaleString() {
+    DateFormat formatter = DateFormat.getDateTimeInstance();
+    return formatter.format(this);
+}
+```
+
+3. @SuppressWarnings 抑制编译器警告注解
+   - 该注解在我们写程序的时候并不是很常见，我们可以用它来让编译器不给予我们警告
+   - 当我们在使用集合的时候，如果没有指定泛型，那么会提示安全检查的警告
+   - 如果我们在类上添加了@SuppressWarnings这个注解，那么编译器就不会给予我们警告了 
+
+4. @SafeVarargs Java 7“堆污染”警告
+   - 什么是堆污染呢？？当把一个不是泛型的集合赋值给一个带泛型的集合的时候，这种情况就很容易发生堆污染。
+   - 这个注解也是用来抑制编译器警告的注解，用的地方并不多。
+
+5. @FunctionalInterface 用来指定该接口是函数式接口
+   - 用该注解显示指定该接口是一个函数式接口。
+
+
+
+### 自定义注解类编写规则
+
+1. Annotation 型定义为 @interface, 所有的 Annotation 会自动继承 java.lang.Annotation 这一接口，并且不能再去继承别的类或是接口.
+2. 参数成员只能用 public 或默认(default)这两个访问权修饰
+3. 参数成员只能用基本类型 byte,short,char,int,long,float,double,boolean 八种基本数据类型和 String、Enum、Class、annotations 等数据类型，以及这一些类型的数组
+4. 要获取类方法和字段的注解信息，必须通过 Java 的反射技术来获取 Annotation 对象，因为你除此之外没有别的获取注解对象的方法
+5. 注解也可以没有定义成员, 不过这样注解就没啥用了
+    PS：自定义注解需要使用到元注解
+
+
+
+### 自定义注解实例
+
+```java
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+/**
+ * 水果名称注解
+ */
+@Target(FIELD)
+@Retention(RUNTIME)
+@Documented
+public @interface FruitName {
+    String value() default "";
+}
+```
+
+# Lambda 表达式
+
+Lambda 表达式，也可称为闭包，它是推动 Java 8 发布的最重要新特性。
+
+Lambda 允许把函数作为一个方法的参数（函数作为参数传递进方法中）。
+
+使用 Lambda 表达式可以使代码变的更加简洁紧凑。
+
+### 语法
+
+lambda 表达式的语法格式如下：
+
+```java
+(parameters) -> expression
+或
+(parameters) -> { statements; }
+```
+
+以下是 lambda 表达式的重要特征:
+
+- **可选类型声明：**不需要声明参数类型，编译器可以统一识别参数值。
+- **可选的参数圆括号：**一个参数无需定义圆括号，但多个参数需要定义圆括号。
+- **可选的大括号：**如果主体包含了一个语句，就不需要使用大括号。
+- **可选的返回关键字：**如果主体只有一个表达式返回值则编译器会自动返回值，大括号需要指定明表达式返回了一个数值。
+
+### 十一、Lambda 表达式实例
+
+Lambda 表达式的简单例子:
+
+```java
+// 1. 不需要参数,返回值为 5  
+() -> 5  
+  
+// 2. 接收一个参数(数字类型),返回其2倍的值  
+x -> 2 * x  
+  
+// 3. 接受2个参数(数字),并返回他们的差值  
+(x, y) -> x – y  
+  
+// 4. 接收2个int型整数,返回他们的和  
+(int x, int y) -> x + y  
+  
+// 5. 接受一个 string 对象,并在控制台打印,不返回任何值(看起来像是返回void)  
+(String s) -> System.out.print(s)
+```
+
+在 Java8Tester.java 文件输入以下代码：
+
+```java
+public class Java8Tester {
+   public static void main(String args[]){
+      Java8Tester tester = new Java8Tester();
+        
+      // 类型声明
+      MathOperation addition = (int a, int b) -> a + b;
+        
+      // 不用类型声明
+      MathOperation subtraction = (a, b) -> a - b;
+        
+      // 大括号中的返回语句
+      MathOperation multiplication = (int a, int b) -> { return a * b; };
+        
+      // 没有大括号及返回语句
+      MathOperation division = (int a, int b) -> a / b;
+        
+      System.out.println("10 + 5 = " + tester.operate(10, 5, addition));
+      System.out.println("10 - 5 = " + tester.operate(10, 5, subtraction));
+      System.out.println("10 x 5 = " + tester.operate(10, 5, multiplication));
+      System.out.println("10 / 5 = " + tester.operate(10, 5, division));
+        
+      // 不用括号
+      GreetingService greetService1 = message ->
+      System.out.println("Hello " + message);
+        
+      // 用括号
+      GreetingService greetService2 = (message) ->
+      System.out.println("Hello " + message);
+        
+      greetService1.sayMessage("Runoob");
+      greetService2.sayMessage("Google");
+   }
+    
+   interface MathOperation {
+      int operation(int a, int b);
+   }
+    
+   interface GreetingService {
+      void sayMessage(String message);
+   }
+    
+   private int operate(int a, int b, MathOperation mathOperation){
+      return mathOperation.operation(a, b);
+   }
+}
+```
+
+执行以上脚本，输出结果为：
+
+```shell
+$ javac Java8Tester.java 
+$ java Java8Tester
+10 + 5 = 15
+10 - 5 = 5
+10 x 5 = 50
+10 / 5 = 2
+Hello Runoob
+Hello Google
+```
+使用 Lambda 表达式需要注意以下两点：
+
+- Lambda 表达式主要用来定义行内执行的方法类型接口，例如，一个简单方法接口。在上面例子中，我们使用各种类型的 Lambda 表达式来定义 MathOperation 接口的方法。然后我们定义了 sayMessage 的执行。
+- Lambda 表达式免去了使用匿名方法的麻烦，并且给予 Java 简单但是强大的函数化的编程能力。
+
+### 变量作用域
+
+lambda 表达式只能引用标记了 final 的外层局部变量，这就是说不能在 lambda 内部修改定义在域外的局部变量，否则会编译错误。
+
+在 Java8Tester.java 文件输入以下代码：
+
+```java
+public class Java8Tester {
+ 
+   final static String salutation = "Hello! ";
+   
+   public static void main(String args[]){
+      GreetingService greetService1 = message -> 
+      System.out.println(salutation + message);
+      greetService1.sayMessage("Runoob");
+   }
+    
+   interface GreetingService {
+      void sayMessage(String message);
+   }
+}
+```
+
+执行以上脚本，输出结果为：
+
+```shell
+$ javac Java8Tester.java 
+$ java Java8Tester
+Hello! Runoob
+```
+
+我们也可以直接在 lambda 表达式中访问外层的局部变量：
+
+```java
+public class Java8Tester {
+    public static void main(String args[]) {
+        final int num = 1;
+        Converter<Integer, String> s = (param) -> System.out.println(String.valueOf(param + num));
+        s.convert(2);  // 输出结果为 3
+    }
+ 
+    public interface Converter<T1, T2> {
+        void convert(int i);
+    }
+}
+```
+
+lambda 表达式的局部变量可以不用声明为 final，但是必须不可被后面的代码修改（即隐性的具有 final 的语义）
+
+```java
+int num = 1;  
+Converter<Integer, String> s = (param) -> System.out.println(String.valueOf(param + num));
+s.convert(2);
+num = 5;  
+//报错信息：Local variable num defined in an enclosing scope must be final or effectively 
+ final
+```
+
+在 Lambda 表达式当中不允许声明一个与局部变量同名的参数或者局部变量。
+
+```java
+String first = ""; 
+
+//编译会出错
+Comparator<String> comparator = (first, second) -> Integer.compare(first.length(), second.length()); 
+```
+
+# 十二、相关知识
+
+
+### 1. 面向对象和面向过程的区别
+
+#### 面向过程
+
+**优点：** 性能比面向对象高，因为类调用时需要实例化，开销比较大，比较消耗资源;比如单片机、嵌入式开发、Linux/Unix等一般采用面向过程开发，性能是最重要的因素。
+
+**缺点：** 没有面向对象易维护、易复用、易扩展
+
+#### 面向对象
+
+**优点：** 易维护、易复用、易扩展，由于面向对象有封装、继承、多态性的特性，可以设计出低耦合的系统，使系统更加灵活、更加易于维护
+
+**缺点：** 性能比面向过程低
+
+### 2.什么是 JDK 什么是 JRE 什么是 JVM 三者之间的联系与区别
+
+这几个是Java中很基本很基本的东西，但是我相信一定还有很多人搞不清楚！为什么呢？因为我们大多数时候在使用现成的编译工具以及环境的时候，并没有去考虑这些东西。
+
+**JDK:**  JDK（Java Development Kit）顾名思义它是给开发者提供的开发工具箱,是给程序开发者用的。它除了包括完整的JRE（Java Runtime Environment），Java运行环境，还包含了其他供开发者使用的工具包。
+
+**JRE:** 普通用户而只需要安装 JRE（Java Runtime Environment）来运行 Java 程序。而程序开发者必须安装JDK来编译、调试程序。
+
+**JVM：** 当我们运行一个程序时，JVM 负责将字节码转换为特定机器代码，JVM 提供了内存管理/垃圾回收和安全机制等。这种独立于硬件和操作系统，正是 java 程序可以一次编写多处执行的原因。
+
+**区别与联系：**
+
+ 1. JDK 用于开发，JRE 用于运行java程序 ；
+ 2. JDK 和 JRE 中都包含 JVM ；
+ 3. JVM 是 java 编程语言的核心并且具有平台独立性。
+
+### 3. 字符型常量和字符串常量的区别
+
+1. 形式上: 字符常量是单引号引起的一个字符 字符串常量是双引号引起的若干个字符
+2. 含义上: 字符常量相当于一个整形值( ASCII 值),可以参加表达式运算 字符串常量代表一个地址值(该字符串在内存中存放位置)
+3. 占内存大小 字符常量只占2个字节 字符串常量占若干个字节(至少一个字符结束标志) (**注意： char在Java中占两个字节**)
+
+### 4. Java 面向对象编程三大特性:封装、继承、多态
+
+### 封装
+
+封装把一个对象的属性私有化，同时提供一些可以被外界访问的属性的方法，如果属性不想被外界访问，我们大可不必提供方法给外界访问。但是如果一个类没有提供给外界访问的方法，那么这个类也没有什么意义了。
+
+
+### 继承
+继承是使用已存在的类的定义作为基础建立新类的技术，新类的定义可以增加新的数据或新的功能，也可以用父类的功能，但不能选择性地继承父类。通过使用继承我们能够非常方便地复用以前的代码。
+
+**关于继承如下 3 点请记住：**
+
+1. 子类拥有父类非 private 的属性和方法。
+2. 子类可以拥有自己属性和方法，即子类可以对父类进行扩展。
+3. 子类可以用自己的方式实现父类的方法。（以后介绍）。
+
+### 多态
+
+所谓多态就是指程序中定义的引用变量所指向的具体类型和通过该引用变量发出的方法调用在编程时并不确定，而是在程序运行期间才确定，即一个引用变量倒底会指向哪个类的实例对象，该引用变量发出的方法调用到底是哪个类中实现的方法，必须在由程序运行期间才能决定。
+
+在Java中有两种形式可以实现多态：继承（多个子类对同一方法的重写）和接口（实现接口并覆盖接口中同一方法）。
+
+### 5.  == 与 equals(重要)
+
+**==** : 它的作用是判断两个对象的地址是不是相等。即，判断两个对象是不是同一个对象。(基本数据类型==比较的是值，引用数据类型==比较的是内存地址)
+
+**equals()** : 它的作用也是判断两个对象是否相等。但它一般有两种使用情况：
+-  情况1：类没有覆盖 equals() 方法。则通过 equals() 比较该类的两个对象时，等价于通过“==”比较这两个对象。
+- 情况2：类覆盖了 equals() 方法。一般，我们都覆盖 equals() 方法来两个对象的内容相等；若它们的内容相等，则返回 true (即，认为这两个对象相等)。
+
+### 6. hashCode 与 equals（重要）
+
+### hashCode（）介绍
+hashCode() 的作用是获取哈希码，也称为散列码；它实际上是返回一个int整数。这个哈希码的作用是确定该对象在哈希表中的索引位置。hashCode() 定义在JDK的Object.java中，这就意味着Java中的任何类都包含有hashCode() 函数。
+
+散列表存储的是键值对(key-value)，它的特点是：能根据“键”快速的检索出对应的“值”。这其中就利用到了散列码！（可以快速找到所需要的对象）
+
+### 为什么要有 hashCode
+
+
+**我们以“HashSet 如何检查重复”为例子来说明为什么要有 hashCode：**
+
+当你把对象加入 HashSet 时，HashSet 会先计算对象的 hashcode 值来判断对象加入的位置，同时也会与其他已经加入的对象的 hashcode 值作比较，如果没有相符的hashcode，HashSet会假设对象没有重复出现。但是如果发现有相同 hashcode 值的对象，这时会调用 equals（）方法来检查 hashcode 相等的对象是否真的相同。如果两者相同，HashSet 就不会让其加入操作成功。如果不同的话，就会重新散列到其他位置。（摘自我的Java启蒙书《Head first java》第二版）。这样我们就大大减少了 equals 的次数，相应就大大提高了执行速度。
+
+### hashCode（）与equals（）的相关规定
+
+1. 如果两个对象相等，则hashcode一定也是相同的
+2. 两个对象相等,对两个对象分别调用equals方法都返回true
+3. 两个对象有相同的hashcode值，它们也不一定是相等的
+4. **因此，equals 方法被覆盖过，则 hashCode 方法也必须被覆盖**
+5. hashCode() 的默认行为是对堆上的对象产生独特值。如果没有重写 hashCode()，则该 class 的两个对象无论如何都不会相等（即使这两个对象指向相同的数据）
+
+### 7. 线程有哪些基本状态？这些状态是如何定义的?
+
+1. **新建(new)**：新创建了一个线程对象。
+2. **可运行(runnable)**：线程对象创建后，其他线程(比如main线程）调用了该对象的start()方法。该状态的线程位于可运行线程池中，等待被线程调度选中，获 取cpu的使用权。
+3. **运行(running)**：可运行状态(runnable)的线程获得了cpu时间片（timeslice），执行程序代码。
+4. **阻塞(block)**：阻塞状态是指线程因为某种原因放弃了cpu使用权，也即让出了cpu timeslice，暂时停止运行。直到线程进入可运行(runnable)状态，才有 机会再次获得cpu timeslice转到运行(running)状态。阻塞的情况分三种：
+(一). 等待阻塞：运行(running)的线程执行o.wait()方法，JVM会把该线程放 入等待队列(waitting queue)中。
+(二). 同步阻塞：运行(running)的线程在获取对象的同步锁时，若该同步锁 被别的线程占用，则JVM会把该线程放入锁池(lock pool)中。
+(三). 其他阻塞: 运行(running)的线程执行Thread.sleep(long ms)或t.join()方法，或者发出了I/O请求时，JVM会把该线程置为阻塞状态。当sleep()状态超时join()等待线程终止或者超时、或者I/O处理完毕时，线程重新转入可运行(runnable)状态。
+5. **死亡(dead)**：线程run()、main()方法执行结束，或者因异常退出了run()方法，则该线程结束生命周期。死亡的线程不可再次复生。
+
+ **提示**：可以用早起坐地铁来比喻这个过程：
+
+还没起床：sleeping 
+
+起床收拾好了，随时可以坐地铁出发：Runnable 
+
+等地铁来：Waiting 
+
+地铁来了，但要排队上地铁：I/O阻塞 
+
+上了地铁，发现暂时没座位：synchronized阻塞 
+
+地铁上找到座位：Running 
+
+到达目的地：Dead
+
+### 8.GC是什么? 为什么要有GC
+ GC是垃圾收集的意思（Gabage Collection）,内存处理是编程人员容易出现问题的地方，忘记或者错误的内存回收会导致程序或系统的不稳定甚至崩溃，Java提供的GC功能可以自动监测对象是否超过作用域从而达到自动回收内存的目的，Java语言没有提供释放已分配内存的显示操作方法。
+
+### 9.String与StringBugger的区别
+
+String的长度是不可变的，StringBuffer的长度是可变的。如果你对字符串中的内容经常进行操作，特别是内容要修改时，那么使用StringBuffer，如果最后需要String，那么使用StringBuffer的toString()方法
+
+### 10.HashMap和Hashtable的区别
+
+HashMap是Hashtable的轻量级实现（非线程安全的实现），他们都完成了Map接口，主要区别在于HashMap允许空（null）键值（key）,由于非线程安全，效率上可能高于Hashtable。HashMap允许将null作为一个entry的key或者value，而Hashtable不允许。HashMap把Hashtable的contains方法去掉了，改成containsvalue和containsKey。因为contains方法容易让人引起误解。 Hashtable继承自Dictionary类，而HashMap是Java1.2引进的Map interface的一个实现。最大的不同是，Hashtable的方法是Synchronize的，而HashMap不是，在多个线程访问Hashtable时，不需要自己为它的方法实现同步，而HashMap 就必须为之提供外同步。 Hashtable和HashMap采用的hash/rehash算法都大概一样，所以性能不会有很大的差异。
+
+
+
+
+
+
+
