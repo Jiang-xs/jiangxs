@@ -284,7 +284,7 @@ E peek()</span></td>
 	四、Map接口
 Map，图，是一种存储键值对映射的容器类，在Map中键可以是任意类型的对象，但不能有重复的键，每个键都对应一个值，真正存储在图中的是键值构成的条目。
 
-###java.util.Map<K,V>
+### java.util.Map<K,V>
 
 <table border="1" width="900" cellspacing="1" cellpadding="1"><tbody><tr><td><span style="font-size:18px;">V get(Object key)<br></span></td>
 <td><span style="font-size:18px;">获得与键对应的值</span></td>
@@ -311,28 +311,28 @@ TreeMap基于红黑树数据结构的实现，键值可以使用Comparable或Com
 	五、其他集合类
 下面主要介绍一下其它几个特殊的集合类，Vector、Stack、HashTable、ConcurrentHashMap以及CopyOnWriteArrayList。
 
-###java.util.Vector<E>
+### java.util.Vector<E>
 
 用法上，Vector与ArrayList基本一致，不同之处在于Vector使用了关键字synchronized将访问和修改向量的方法都变成同步的了，所以对于不需要同步的应用程序来说，类ArrayList比类Vector更高效。
 
-###java.util.Stack<E>
+### java.util.Stack<E>
 
 Stack，栈类，是Java2之前引入的，继承自类Vector。
 
-###java.util.HashTable
+### java.util.HashTable
 
 HashTable和前面介绍的HashMap很类似，它也是一个散列表，存储的内容是键值对映射，不同之处在于，HashTable是继承自Dictionary的，HashTable中的函数都是同步的，这意味着它也是线程安全的，另外，HashTable中key和value都不可以为null。
 
-###java.util.ConcurrentHashMap
+### java.util.ConcurrentHashMap
 
 ConcurrentHashMap是HashMap的线程安全版。同HashMap相比，ConcurrentHashMap不仅保证了访问的线程安全性，而且在效率上与HashTable相比，也有较大的提高。
 
-###java.util.CopyOnWriteArrayList
+### java.util.CopyOnWriteArrayList
 
 CopyOnWriteArrayList，是一个线程安全的List接口的实现，它使用了ReentrantLock锁来保证在并发情况下提供高性能的并发读取。
 
 
-###java.util.CopyOnWriteArraySet
+### java.util.CopyOnWriteArraySet
 
 CopyOnWriteArraySet，是一个线程安全的set接口的实现，它使用了ReentrantLock锁来保证在并发情况下提供高性能的并发读取。
 
