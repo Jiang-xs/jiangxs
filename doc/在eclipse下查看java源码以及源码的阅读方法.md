@@ -108,4 +108,4 @@ Java IO 包，我认为是对继承和接口运用得最优雅的案例。如果
 
 
 
-参考：[http://https://blog.csdn.net/guotufu/article/details/80247268](http://https://blog.csdn.net/guotufu/article/details/80247268 "读java源码的好处") 
+参考：[https://blog.csdn.net/guotufu/article/details/80247268](https://blog.csdn.net/guotufu/article/details/80247268 "读java源码的好处") 
