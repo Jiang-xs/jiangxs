@@ -1,5 +1,8 @@
 # 深入理解JVM
 
+## 前言
+JVM = 类加载器(classloader) + 执行引擎(execution engine) + 运行时数据区域(runtime data area)
+
 ## Java内存模型
 
 由于Java程序是交由JVM执行的，所以我们在谈Java内存区域划分的时候事实上是指JVM内存区域划分。在讨论JVM内存区域划分之前，先来看一下Java程序具体执行的过程：
