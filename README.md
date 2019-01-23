@@ -12,7 +12,7 @@
 ## 关于作者
 
 　　作者是一名具有3-5年的工作的普通程序猿，同样处于职业瓶颈期，想借此机会结交广大志同道合的朋友，下面是我的微信：
-<div align="center"> 
+
 ![](https://raw.githubusercontent.com/Jiang-xs/jiangxs/master/assets/weixin.png)
 
 
